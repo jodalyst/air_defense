@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html>
+<head>
+<script src="https://d3js.org/d3.v3.min.js" charset="utf-8"></script>
+<title>FUN GAME</title>
+<body>
+
+<div id="game_field"></div>
+
+<!--<script src="./game.js"></script>-->
+
+<script>
+
+/*
+Icon made by Recep Kutuk from www.flaticon.com 
+Icon made by Freepik from www.flaticon.com 
+
+*/
+
+CITIES = ["New York","Boston","Pittsburgh", "Kalamazoo", "Stuebenville"]
+LAUNCHERS = ["Alpha", "Bravo", "Charlie", "Delta", "Echo","Foxtrot"]
+
+GAME_WIDTH = 800;
+GAME_HEIGHT = 500;
+NUMBER_OF_CITIES = 6;
+NUMBER_OF_LAUNCHERS = NUMBER_OF_CITIES-1;
+LAUNCHER_HEIGHT = 30;
+LAUNCHER_WIDTH = 20;
+CITY_WIDTH = 20;
+CITY_HEIGHT = 30;
+THING_EDGE_BUFFER =10;
+THING_GAP = (GAME_WIDTH-(NUMBER_OF_LAUNCHERS*LAUNCHER_WIDTH)-(NUMBER_OF_CITIES*CITY_WIDTH)-2*THING_EDGE_BUFFER)/(NUMBER_OF_CITIES+NUMBER_OF_LAUNCHERS-1);
+
+SAM_DET_PROX = 2;
+
+
+console.log(THING_GAP);
+
+var launchers = [];
+var cities = [];
+var icbms = [];
+var sams = [];
+
+var game_field = d3.select("#game_field").append("svg").attr("width",GAME_WIDTH).attr("height",GAME_HEIGHT);
+
+
+function setup(){
+    game_field.selectAll("*").remove();
+    cities = [];
+    var city_count = 0;
+    var launcher_count = 0;
+    for (var i=0; i<NUMBER_OF_CITIES+NUMBER_OF_LAUNCHERS; i++){
+        if (i%2==0){
+            console.log("adding city");
+            var city = game_field.append("svg:image").attr("xlink:href", "./resources/city.svg")
+                .attr("width", CITY_WIDTH).attr("height", CITY_HEIGHT)
+                .attr("x", THING_EDGE_BUFFER+city_count*(CITY_WIDTH+THING_GAP)+launcher_count*(LAUNCHER_WIDTH+THING_GAP)).attr("y",GAME_HEIGHT-CITY_HEIGHT).attr("id", "city_"+CITIES[city_count]);
+            cities.push(city);
+            city_count +=1;
+        }else{
+            console.log("adding launcher");
+            var launcher = game_field.append("svg:image").attr("xlink:href", "./resources/satellite-dish.svg")
+                .attr("width", LAUNCHER_WIDTH).attr("height", LAUNCHER_HEIGHT)
+                .attr("x", THING_EDGE_BUFFER+city_count*(CITY_WIDTH+THING_GAP)+launcher_count*(LAUNCHER_WIDTH+THING_GAP)).attr("y",GAME_HEIGHT-LAUNCHER_HEIGHT).attr("id", "launcher_"+LAUNCHERS[launcher_count]);
+            launchers.push(launcher);
+            launcher_count +=1;
+        }
+    }
+}
+window.onload = function(){
+    game_field.style("background-color", 'black');
+    setup();
+    console.log(cities);
+    mainGameLoop();
+}
+
+function XYBreakdown(var x1, var y1, var x2, var y2, var speed){
+    var xdiff = x1-x2;
+    var ydiff = y1-y2;
+    var hypo = Math.sqrt(Math.pow(xdiff,2)+Math.pow(ydiff,2));
+    var incrx = speed*xdiff/hypo;
+    var incry = speed*ydiff/hypo;
+    return {incrx, incry};
+}
+
+function isNear(var x1, var y1, var x2, var y2, var nearness){
+    if (Math.pow(x1-x2,2)+Math.pow(y1-y2,2)<=Math.pow(nearness,2)) return true;
+    else return false;
+}
+
+function ICBM(var launch_x, var launch_y, var target_x, var target_y, var speed){
+
+}
+
+function SAM(var launch_x, var launch_y, var target_x, var target_y, var speed){    
+    var start_x = launch_x;
+    var start_y = launch_y;
+    var target_x = target_x;
+    var target_y = target_y;
+    var speed = speed;
+    var current_x = start_x;
+    var current_y = start_y;
+    var explode = false;
+    var wave;
+    var incr_x, incr_y = XYBreakdown(start_x, start_y,target_x,target_y,speed);
+    console.log(incr_x, incr_y);
+    var trajectory = game_field.append("line").attr("x1",start_x).attr("y1",start_y)
+            .attr("x2",start_x).attr("y2",start_y).attr("stroke-width",2).attr("stroke","white");
+    var step = function(){
+        if (explode){
+            
+        }else if (isNear(current_x, current_y, target_x, target_y,SAM_DET_PROX)){
+            wave = game_field.append("circle").attr("cx",target_x).attr("cy",target_y).attr("r",0)
+                    .attr("fill","black").attr("stroke-width",2).attr("stroke","white");
+            explode = true;
+        }else{
+            current_x += incr_x;
+            current_y += incr_y; 
+        } 
+
+
+    }
+
+
+}
+
+function mainGameLoop(){
+    SAM(1,2,30,40,1);
+
+}
+
+</script>
+</body>
+</html>
+
