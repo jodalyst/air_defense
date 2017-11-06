@@ -4,7 +4,7 @@
 <script src="https://d3js.org/d3.v3.min.js" charset="utf-8"></script>
 <title>FUN GAME</title>
 <body>
-
+<br><br><br><br>
 <div id="game_field"></div>
 
 <!--<script src="./game.js"></script>-->
@@ -31,34 +31,50 @@ CITY_HEIGHT = 30;
 THING_EDGE_BUFFER =10;
 THING_GAP = (GAME_WIDTH-(NUMBER_OF_LAUNCHERS*LAUNCHER_WIDTH)-(NUMBER_OF_CITIES*CITY_WIDTH)-2*THING_EDGE_BUFFER)/(NUMBER_OF_CITIES+NUMBER_OF_LAUNCHERS-1);
 
-SAM_DET_PROX = 2;
+SAM_DET_PROX = 2; //detonation proximity of SAM missile
+WAVE_SPEED = 0.5;
+SAM_EXPLODE_MAX = 20;
+ICBM_EXPLODE_MAX = 30;
+ICBM_DET_PROX = 2; //detonation proximity of ICBM missile
+SAM_SPEED = 3;
 
+GAME_TS = 30;
 
-console.log(THING_GAP);
 
 var launchers = [];
 var cities = [];
 var icbms = [];
 var sams = [];
 
+var sam_count;
+
+var score;
+
+var icbm_speed = SAM_SPEED;
+var icbm_rarity = 0.05;
+
+
 var game_field = d3.select("#game_field").append("svg").attr("width",GAME_WIDTH).attr("height",GAME_HEIGHT);
+var score = game_field.append("text").attr("x",10).attr("y",10).attr("id","score").attr("font-size",10).attr("font-family","sans-serif").attr("font-color","white");
+var arsenal = game_field.append("text").attr("x",10).attr("y",20).attr("id","arsenal").attr("font-size",10).attr("font-family","sans-serif").attr("font-color","white");
+var time_left = game_field.append("text").attr("x",10).attr("y",30).attr("id","timeleft").attr("font-size",10).attr("font-family","sans-serif").attr("font-color","white");
+
 
 
 function setup(){
     game_field.selectAll("*").remove();
+    sam_count = 10;
     cities = [];
     var city_count = 0;
     var launcher_count = 0;
     for (var i=0; i<NUMBER_OF_CITIES+NUMBER_OF_LAUNCHERS; i++){
         if (i%2==0){
-            console.log("adding city");
             var city = game_field.append("svg:image").attr("xlink:href", "./resources/city.svg")
                 .attr("width", CITY_WIDTH).attr("height", CITY_HEIGHT)
                 .attr("x", THING_EDGE_BUFFER+city_count*(CITY_WIDTH+THING_GAP)+launcher_count*(LAUNCHER_WIDTH+THING_GAP)).attr("y",GAME_HEIGHT-CITY_HEIGHT).attr("id", "city_"+CITIES[city_count]);
             cities.push(city);
             city_count +=1;
         }else{
-            console.log("adding launcher");
             var launcher = game_field.append("svg:image").attr("xlink:href", "./resources/satellite-dish.svg")
                 .attr("width", LAUNCHER_WIDTH).attr("height", LAUNCHER_HEIGHT)
                 .attr("x", THING_EDGE_BUFFER+city_count*(CITY_WIDTH+THING_GAP)+launcher_count*(LAUNCHER_WIDTH+THING_GAP)).attr("y",GAME_HEIGHT-LAUNCHER_HEIGHT).attr("id", "launcher_"+LAUNCHERS[launcher_count]);
@@ -67,67 +83,171 @@ function setup(){
         }
     }
 }
+
+var timer;
+
 window.onload = function(){
     game_field.style("background-color", 'black');
     setup();
-    console.log(cities);
-    mainGameLoop();
+    timer = setInterval(mainGameLoop,GAME_TS);
 }
 
-function XYBreakdown(var x1, var y1, var x2, var y2, var speed){
-    var xdiff = x1-x2;
-    var ydiff = y1-y2;
+//Used for speed calculation in the X and Y dimensions (given speed specified magnitude speed)
+function XYBreakdown( x1,  y1,  x2,  y2,  speed){
+    var xdiff = x2-x1;
+    var ydiff = y2-y1;
     var hypo = Math.sqrt(Math.pow(xdiff,2)+Math.pow(ydiff,2));
     var incrx = speed*xdiff/hypo;
     var incry = speed*ydiff/hypo;
-    return {incrx, incry};
+    return [incrx, incry];
 }
 
-function isNear(var x1, var y1, var x2, var y2, var nearness){
+function isNear( x1,  y1,  x2,  y2,  nearness){
     if (Math.pow(x1-x2,2)+Math.pow(y1-y2,2)<=Math.pow(nearness,2)) return true;
     else return false;
 }
 
-function ICBM(var launch_x, var launch_y, var target_x, var target_y, var speed){
-
+function ICBM(launch_x,launch_y,target_x,target_y,speed){
+    var start_x = Number(launch_x);
+    var start_y = Number(launch_y);
+    var target_x = target_x;
+    var target_y = target_y;
+    var speed = speed;
+    this.current_x = start_x;
+    this.current_y = start_y;
+    var explode = false;
+    this.explode_radius = 0;
+    var that = this;
+    this.wave;
+    var diff_coords = XYBreakdown(start_x, start_y,target_x,target_y,speed);
+    var incr_x = diff_coords[0];
+    var incr_y = diff_coords[1]; 
+    this.trajectory = game_field.append("line").attr("x1",start_x).attr("y1",start_y)
+            .attr("x2",start_x).attr("y2",start_y).attr("stroke-width",1).attr("stroke","white");
+    this.step = function(){
+        if (explode){  //if in exploding mode:
+            if (explode_radius > ICBM_EXPLODE_MAX) return true; //if explosion large enough
+            explode_radius += WAVE_SPEED;
+            that.wave.transition().duration(0).attr("r",explode_radius);
+        }else if (isNear(that.current_x, that.current_y, target_x, target_y,ICBM_DET_PROX)){ //if missile has reached its explosion location 
+            that.wave = game_field.append("circle").attr("cx",target_x).attr("cy",target_y).attr("r",explode_radius)
+                    .attr("fill","black").attr("stroke-width",1).attr("stroke","white");
+            that.trajectory.remove();
+            explode = true;
+        }else{
+            that.current_x += incr_x;
+            that.current_y += incr_y; 
+            that.trajectory.transition().duration(0).attr("x2",that.current_x).attr("y2",that.current_y);
+        } 
+    }
+};
 }
 
-function SAM(var launch_x, var launch_y, var target_x, var target_y, var speed){    
-    var start_x = launch_x;
-    var start_y = launch_y;
+function SAMChooser(x){
+    return 1;
+}
+
+var SAM = function(launch_x,launch_y,target_x,target_y,speed){    
+    var start_x = Number(launch_x);
+    var start_y = Number(launch_y);
     var target_x = target_x;
     var target_y = target_y;
     var speed = speed;
     var current_x = start_x;
     var current_y = start_y;
-    var explode = false;
-    var wave;
-    var incr_x, incr_y = XYBreakdown(start_x, start_y,target_x,target_y,speed);
-    console.log(incr_x, incr_y);
-    var trajectory = game_field.append("line").attr("x1",start_x).attr("y1",start_y)
-            .attr("x2",start_x).attr("y2",start_y).attr("stroke-width",2).attr("stroke","white");
-    var step = function(){
-        if (explode){
-            
-        }else if (isNear(current_x, current_y, target_x, target_y,SAM_DET_PROX)){
-            wave = game_field.append("circle").attr("cx",target_x).attr("cy",target_y).attr("r",0)
-                    .attr("fill","black").attr("stroke-width",2).attr("stroke","white");
-            explode = true;
+    this.explode = false;
+    this.explode_radius = 0;
+    var that = this;
+    this.wave;
+    var diff_coords = XYBreakdown(start_x, start_y,target_x,target_y,speed);
+    var incr_x = diff_coords[0];
+    var incr_y = diff_coords[1]; 
+    this.trajectory = game_field.append("line").attr("x1",start_x).attr("y1",start_y)
+            .attr("x2",start_x).attr("y2",start_y).attr("stroke-width",1).attr("stroke","white");
+    this.step = function(){
+        if (that.explode){  //if in exploding mode:
+            if (that.explode_radius > SAM_EXPLODE_MAX) return true; //if explosion large enough
+            that.explode_radius += WAVE_SPEED;
+            that.wave.transition().duration(0).attr("r",that.explode_radius);
+        }else if (isNear(current_x, current_y, target_x, target_y,SAM_DET_PROX)){ //if missile has reached its explosion location 
+            that.wave = game_field.append("circle").attr("cx",target_x).attr("cy",target_y).attr("r",that.explode_radius)
+                    .attr("fill","black").attr("stroke-width",1).attr("stroke","white");
+            that.trajectory.remove();
+            that.explode = true;
         }else{
             current_x += incr_x;
             current_y += incr_y; 
+            that.trajectory.transition().duration(0).attr("x2",current_x).attr("y2",current_y);
         } 
-
-
     }
+};
 
-
+function samLaunch(){
+    var spot = d3.mouse(game_field.node());
+    if (sam_count==0) return false;
+    var site = samChooser(spot[0]);
+    sam_count -=1;
+    var localsam = new SAM(Number(launchers[site].attr("x"))+LAUNCHER_WIDTH/2,launchers[site].attr("y"),spot[0],spot[1],SAM_SPEED);
+    sams.push(localsam);
 }
+
+function samChooser(x){
+    if (launchers.length ==0) return false;
+    var closest = null;
+    var min = GAME_WIDTH*3; 
+    for (var i=0; i<launchers.length; i++){
+        var temp = Math.abs(launchers[i].attr("x")-x);
+        if (temp<min){
+            closest = i;
+            min =  temp;
+        }
+    }
+    return closest;
+}
+
+
+game_field.on("click", samLaunch);
 
 function mainGameLoop(){
-    SAM(1,2,30,40,1);
+    //update live missiles and remove dead ones
+    var to_remove = null;
+    var i = 0;
+    for (var i = 0; i<sams.length; i++){
+        var is_running = sams[i].step();
+        if (is_running && to_remove ===null){
+            to_remove = i;
+            sams[i].trajectory.remove();
+            sams[i].wave.remove();
+        }
+    }
+    if (to_remove !==null)sams.splice(to_remove,1);
 
+
+    //add in new icbms: 
+    if (Math.random()<icbm_rarity){
+        var start_x = Math.random()*GAME_WIDTH;
+        var target_x = Math.random()*GAME_WIDTH;a
+        var localicbm = new ICBM(start_x,0,target_x,GAME)HEIGHT,icbm_speed);
+        icbms.push(localsam);
+    }
 }
+
+
+function announcement(text,color="red"){
+    var ann = game_field.append("text").attr("class","ann").attr("fill",color).attr("text-anchor","middle")
+            .text("Limited to 3 Frequencies!").attr("x",GAME_WIDTH/2).attr("y",GAME_HEIGHT/2);
+    ann.transition().duration(1000).style("opacity","0").remove();
+}
+
+//Display Updaters:
+function score_update() {
+  score.text(function(){
+    return "Score: "+score.toString();
+  });
+};
+
+
+
 
 </script>
 </body>
