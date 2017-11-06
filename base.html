@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <html>
 <head>
-<script src="https://d3js.org/d3.v3.min.js" charset="utf-8"></script>
+<script src="https://d3js.org/d3.v4.min.js" charset="utf-8"></script>
+<link rel="stylesheet" href="./resources/game.css">
 <title>FUN GAME</title>
 <body>
 <br><br><br><br>
@@ -51,19 +52,20 @@ var sam_count;
 var score;
 
 var icbm_speed = SAM_SPEED;
-var icbm_rarity = 0.05;
+var icbm_rarity = 0.01;
 
 
 var game_field = d3.select("#game_field").append("svg").attr("width",GAME_WIDTH).attr("height",GAME_HEIGHT);
-var score = game_field.append("text").attr("x",10).attr("y",10).attr("id","score").attr("font-size",10).attr("font-family","sans-serif").attr("font-color","white");
-var arsenal = game_field.append("text").attr("x",10).attr("y",20).attr("id","arsenal").attr("font-size",10).attr("font-family","sans-serif").attr("font-color","white");
-var time_left = game_field.append("text").attr("x",10).attr("y",30).attr("id","timeleft").attr("font-size",10).attr("font-family","sans-serif").attr("font-color","white");
+var score_disp = game_field.append("text").attr("x",10).attr("y",10).attr("id","score").attr("font-size",10).attr("font-family","sans-serif").attr("font-color","lime");
+var arsenal = game_field.append("text").attr("x",10).attr("y",20).attr("id","arsenal").attr("font-size",10).attr("font-family","sans-serif").attr("font-color","lime");
+var time_left = game_field.append("text").attr("x",10).attr("y",30).attr("id","timeleft").attr("font-size",10).attr("font-family","sans-serif").attr("font-color","lime");
 
 
 
 function setup(){
     game_field.selectAll("*").remove();
     sam_count = 10;
+    score = 0;
     cities = [];
     var city_count = 0;
     var launcher_count = 0;
@@ -110,30 +112,30 @@ function isNear( x1,  y1,  x2,  y2,  nearness){
 function ICBM(launch_x,launch_y,target_x,target_y,speed){
     var start_x = Number(launch_x);
     var start_y = Number(launch_y);
-    var target_x = target_x;
-    var target_y = target_y;
+    this.target_x = target_x;
+    this.target_y = target_y;
     var speed = speed;
     this.current_x = start_x;
     this.current_y = start_y;
-    var explode = false;
+    this.explode = false;
     this.explode_radius = 0;
     var that = this;
     this.wave;
-    var diff_coords = XYBreakdown(start_x, start_y,target_x,target_y,speed);
+    var diff_coords = XYBreakdown(start_x, start_y,this.target_x,this.target_y,speed);
     var incr_x = diff_coords[0];
     var incr_y = diff_coords[1]; 
     this.trajectory = game_field.append("line").attr("x1",start_x).attr("y1",start_y)
             .attr("x2",start_x).attr("y2",start_y).attr("stroke-width",1).attr("stroke","white");
     this.step = function(){
-        if (explode){  //if in exploding mode:
-            if (explode_radius > ICBM_EXPLODE_MAX) return true; //if explosion large enough
-            explode_radius += WAVE_SPEED;
-            that.wave.transition().duration(0).attr("r",explode_radius);
-        }else if (isNear(that.current_x, that.current_y, target_x, target_y,ICBM_DET_PROX)){ //if missile has reached its explosion location 
-            that.wave = game_field.append("circle").attr("cx",target_x).attr("cy",target_y).attr("r",explode_radius)
+        if (that.explode){  //if in exploding mode:
+            if (that.explode_radius > ICBM_EXPLODE_MAX) return true; //if explosion large enough
+            that.explode_radius += WAVE_SPEED;
+            that.wave.transition().duration(0).attr("r",that.explode_radius);
+        }else if (isNear(that.current_x, that.current_y, that.target_x, that.target_y,ICBM_DET_PROX)){ //if missile has reached its explosion location 
+            that.wave = game_field.append("circle").attr("cx",that.target_x).attr("cy",that.target_y).attr("r",that.explode_radius)
                     .attr("fill","black").attr("stroke-width",1).attr("stroke","white");
             that.trajectory.remove();
-            explode = true;
+            that.explode = true;
         }else{
             that.current_x += incr_x;
             that.current_y += incr_y; 
@@ -141,7 +143,6 @@ function ICBM(launch_x,launch_y,target_x,target_y,speed){
         } 
     }
 };
-}
 
 function SAMChooser(x){
     return 1;
@@ -150,8 +151,8 @@ function SAMChooser(x){
 var SAM = function(launch_x,launch_y,target_x,target_y,speed){    
     var start_x = Number(launch_x);
     var start_y = Number(launch_y);
-    var target_x = target_x;
-    var target_y = target_y;
+    this.target_x = target_x;
+    this.target_y = target_y;
     var speed = speed;
     var current_x = start_x;
     var current_y = start_y;
@@ -159,7 +160,7 @@ var SAM = function(launch_x,launch_y,target_x,target_y,speed){
     this.explode_radius = 0;
     var that = this;
     this.wave;
-    var diff_coords = XYBreakdown(start_x, start_y,target_x,target_y,speed);
+    var diff_coords = XYBreakdown(start_x, start_y,this.target_x,this.target_y,speed);
     var incr_x = diff_coords[0];
     var incr_y = diff_coords[1]; 
     this.trajectory = game_field.append("line").attr("x1",start_x).attr("y1",start_y)
@@ -169,8 +170,8 @@ var SAM = function(launch_x,launch_y,target_x,target_y,speed){
             if (that.explode_radius > SAM_EXPLODE_MAX) return true; //if explosion large enough
             that.explode_radius += WAVE_SPEED;
             that.wave.transition().duration(0).attr("r",that.explode_radius);
-        }else if (isNear(current_x, current_y, target_x, target_y,SAM_DET_PROX)){ //if missile has reached its explosion location 
-            that.wave = game_field.append("circle").attr("cx",target_x).attr("cy",target_y).attr("r",that.explode_radius)
+        }else if (isNear(current_x, current_y, that.target_x, that.target_y,SAM_DET_PROX)){ //if missile has reached its explosion location 
+            that.wave = game_field.append("circle").attr("cx",that.target_x).attr("cy",that.target_y).attr("r",that.explode_radius)
                     .attr("fill","black").attr("stroke-width",1).attr("stroke","white");
             that.trajectory.remove();
             that.explode = true;
@@ -210,25 +211,70 @@ game_field.on("click", samLaunch);
 
 function mainGameLoop(){
     //update live missiles and remove dead ones
-    var to_remove = null;
-    var i = 0;
-    for (var i = 0; i<sams.length; i++){
+    var to_remove = [];
+    for (var i = sams.length-1; i>=0; i--){
         var is_running = sams[i].step();
-        if (is_running && to_remove ===null){
-            to_remove = i;
-            sams[i].trajectory.remove();
-            sams[i].wave.remove();
+        if (is_running){
+            console.log("done");
+            to_remove.push(i);
         }
     }
-    if (to_remove !==null)sams.splice(to_remove,1);
-
-
+    for (var i = to_remove.length-1; i>=0; i--){
+        sams[i].wave.remove();
+        sams.splice(to_remove[i],1);
+    }
+    //What ICBMS need to be removed?
+    to_removes = [];
+    for (var i = 0; i<icbms.length; i++){
+        var is_running = icbms[i].step();
+        if(icbms[i].explode){
+            
+            for (var c=cities.length-1; c>=0; c--){
+                if(isNear(icbms[i].target_x,0,Number(cities[c].attr("x"))+CITY_WIDTH/2,0,icbms[i].explode_radius)){
+                    console.log("hit");
+                    cities[c].remove();
+                    cities.splice(c,1);
+                }
+            }
+            for (var a=launchers.length-1; a>=0; a--){
+                if(isNear(icbms[i].target_x,0,Number(launchers[a].attr("x"))+LAUNCHER_WIDTH/2,0,icbms[i].explode_radius)){
+                    launchers[a].remove();
+                    launchers.splice(a,1);
+                }
+            }
+        }
+        if (is_running){ //blown up!
+            to_removes.push(i);
+            icbms[i].wave.remove();
+        }else{
+            for (var j = 0; j<sams.length; j++){
+                if (sams[j].explode){
+                    if(~sams[j].explode && isNear(icbms[i].current_x, icbms[i].current_y, sams[j].target_x, sams[j].target_y,sams[j].explode_radius)){
+                        console.log("got one!");
+                        score +=1;
+                        to_removes.push(i);
+                        icbms[i].trajectory.remove();
+                    }
+                }
+            } 
+        }
+    }
+    for (var i =to_removes.length-1; i>=0; i--){
+        icbms.splice(to_removes[i],1);
+    } 
+    
     //add in new icbms: 
     if (Math.random()<icbm_rarity){
         var start_x = Math.random()*GAME_WIDTH;
-        var target_x = Math.random()*GAME_WIDTH;a
-        var localicbm = new ICBM(start_x,0,target_x,GAME)HEIGHT,icbm_speed);
-        icbms.push(localsam);
+        var target_x = Math.random()*GAME_WIDTH;
+        var localicbm = new ICBM(start_x,0,target_x,GAME_HEIGHT,icbm_speed);
+        icbms.push(localicbm);
+    }
+    score_update();
+    time_update();
+    arsenal_update();
+    if (cities.length ===0 && launchers.length===0){
+        console.log("You failed.");
     }
 }
 
@@ -241,11 +287,18 @@ function announcement(text,color="red"){
 
 //Display Updaters:
 function score_update() {
-  score.text(function(){
+  score_disp.text(function(){
     return "Score: "+score.toString();
   });
 };
 
+function time_update(){
+
+};
+
+function arsenal_update(){
+
+};
 
 
 
